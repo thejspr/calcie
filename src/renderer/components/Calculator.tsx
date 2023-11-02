@@ -1,28 +1,55 @@
-export default function Calculator({ calcContent }) {
-    let calcContentArray = calcContent.split('\n');
-    let results = []
-    calcContentArray.map((calc, index) => {
-      let result;
-      let excendedCalc = calc;
+import PropTypes from 'prop-types';
+import { useState } from 'react';
 
-      try {
-        // Replace $\d with results
-        let excendedCalc = calc.replace(/\$\d+/, (match) => {
-          return results[match.replace('$', '') - 1];
-        })
-        result = eval(excendedCalc);
-      } catch (e) {
-        result = 'Error: ' + e + " | " + excendedCalc;
-      }
-
-      results.push(result);
-    })
-
-    return <>
-      <div className="border w-[166px] h-[250px] font-semibold px-2 py-1">
-        {results.map((res, index) => {
-          return <div key={index}>{res}</div>
-        })}
-      </div>
-    </>
+interface CalculatorProps {
+  calcContent: string;
 }
+
+export default function Calculator({ calcContent }: CalculatorProps) {
+  const calcContentArray = calcContent.split('\n');
+  const [results] = useState([]);
+
+  calcContentArray.map((calc: string, index: number) => {
+    let extendedCalc;
+    let result;
+
+    try {
+      // Replace $\d with results
+      extendedCalc = calc.replace(/\$\d+/, (match) => {
+        return String(results[Number(match.replace('$', '')) - 1]);
+      });
+
+      if (extendedCalc.includes('to')) {
+        // convert currency
+        const matches = extendedCalc.match(/(\d+)([A-Za-z]{3}) to ([A-Za-z]{3})/);
+
+        fetch('https://api.exchangerate-api.com/v4/latest/USD')
+          .then((response) => response.json())
+          .then((data) => {
+              let rate = data.rates[matches[3].toUpperCase()] / data.rates[matches[2].toUpperCase()];
+              results[index] = (matches[1] * rate).toFixed(2);
+        })
+        .catch(error => console.error('Error:', error));
+      } else {
+        // eslint-disable-next-line no-eval
+        result = eval(extendedCalc);
+        results[index] = result;
+      }
+    } catch (e) {
+      result = `Error: ${e} | ${extendedCalc}`;
+      // results.push(result);
+    }
+  });
+
+  return (
+    <div className="border w-[166px] h-[250px] font-semibold px-2 py-1 leading-7">
+      {results.map((res, index) => {
+        return <div key={`result-${index.toString()}`}>{res}</div>;
+      })}
+    </div>
+  );
+}
+
+Calculator.propTypes = {
+  calcContent: PropTypes.string.isRequired,
+};
